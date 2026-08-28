@@ -416,6 +416,7 @@ class MeteoClient:
         try:
             logger.debug("Requesting station data from %s...", url)
             with requests.get(url, stream = True, timeout = REQUEST_TIMEOUT) as r:
+                r.raise_for_status()
                 lines = (line.decode(encoding) for line in r.iter_lines())
                 yield from csv.DictReader(lines, delimiter=';')
         except requests.exceptions.RequestException:
@@ -426,11 +427,17 @@ class MeteoClient:
         try:
             url = FORECAST_URL.format(int(postCode))
             logger.debug("Requesting forecast data from %s...", url)
-            return requests.get(url, headers =
-                { "User-Agent": FORECAST_USER_AGENT,
+            response = requests.get(
+                url,
+                headers={
+                    "User-Agent": FORECAST_USER_AGENT,
                     "Accept-Language": language,
-                    "Accept": "application/json" },
-                timeout = REQUEST_TIMEOUT).json()
-        except requests.exceptions.RequestException as e:
-            logger.error("Connection failure.", exc_info=1)
+                    "Accept": "application/json",
+                },
+                timeout=REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException:
+            logger.error("Connection failure.", exc_info=True)
             return None
