@@ -15,6 +15,28 @@ CURRENT_CONDITION_URL= 'https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktu
 FORECAST_URL= "https://app-prod-ws.meteoswiss-app.ch/v2/plzDetail?plz={:<06d}"
 FORECAST_USER_AGENT = "android-31 ch.admin.meteoswiss-2160000"
 
+# Languages MeteoSwiss publishes its data in.
+SUPPORTED_LANGUAGES = ("de", "fr", "it", "en")
+DEFAULT_LANGUAGE = "en"
+
+"""
+Maps a Home Assistant language tag onto a language MeteoSwiss supports.
+
+Home Assistant hands out tags like "de", "de-CH" or "pt-BR"; MeteoSwiss only
+serves de, fr, it and en. Anything else falls back to English.
+"""
+def to_meteoswiss_language(language: str | None) -> str:
+    if not language:
+        return DEFAULT_LANGUAGE
+
+    base = language.replace("_", "-").split("-")[0].lower()
+    if base in SUPPORTED_LANGUAGES:
+        return base
+
+    logger.debug("Language %s is not served by MeteoSwiss, falling back to %s.",
+                 language, DEFAULT_LANGUAGE)
+    return DEFAULT_LANGUAGE
+
 CONDITION_CLASSES = {
     "clear-night": [101],
     "cloudy": [5,35,105,126,135],
@@ -165,15 +187,16 @@ class WeatherForecast:
     warnings: list[Warning] | None
 
 class MeteoClient:
-    language: str = "en"
+    language: str = DEFAULT_LANGUAGE
 
     """
     Initializes the client.
 
-    Languages available are en, de, fr and it.
+    Languages available are en, de, fr and it. Any other tag (including full
+    Home Assistant tags such as "de-CH") is normalized to one of those.
     """
-    def __init__(self, language="en"):
-        self.language = language
+    def __init__(self, language=DEFAULT_LANGUAGE):
+        self.language = to_meteoswiss_language(language)
 
     def get_current_weather_for_all_stations(self) -> list[CurrentWeather] | None:
         logger.debug("Retrieving current weather for all stations ...")
